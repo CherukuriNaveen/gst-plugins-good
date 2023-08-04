@@ -1572,7 +1572,7 @@ gst_v4l2_object_v4l2fourcc_to_bare_struct (guint32 fourcc)
     case V4L2_PIX_FMT_XBGR32:
     case V4L2_PIX_FMT_ABGR32:
     case V4L2_PIX_FMT_NV12:    /* 12  Y/CbCr 4:2:0  */
-    case V4L2_PIX_FMT_YUV444P:    /* 24 YCbCr 4:4:4  */
+    case V4L2_PIX_FMT_YUV444P: /* 24 YCbCr 4:4:4  */
     case V4L2_PIX_FMT_NV12M:
     case V4L2_PIX_FMT_NV12MT:
     case V4L2_PIX_FMT_NV21:    /* 12  Y/CrCb 4:2:0  */
@@ -5055,6 +5055,13 @@ gst_v4l2_object_decide_allocation (GstV4l2Object * obj, GstQuery * query)
           FALSE);
     }
 
+  } else if (V4L2_TYPE_IS_CAPTURE (obj->type)
+      && (obj->mode == GST_V4L2_IO_USERPTR)) {
+    // since we reuse right index, so let's keep buffer number of downstream pool same with v4l2buffer pool
+    own_min = obj->min_buffers + min + 1;
+    GST_DEBUG ("got min: %d own_min: %d max: %d min_buffers:%d", min, own_min,
+        max, obj->min_buffers);
+    min = own_min;
   } else {
     /* In this case we'll have to configure two buffer pool. For our buffer
      * pool, we'll need what the driver one, and one more, so we can dequeu */

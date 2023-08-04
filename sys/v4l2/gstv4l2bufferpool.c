@@ -104,6 +104,7 @@ gst_v4l2_is_buffer_valid (GstBuffer * buffer, GstV4l2MemoryGroup ** out_group)
     }
 
     valid = TRUE;
+
     if (out_group)
       *out_group = group;
   }
@@ -445,9 +446,40 @@ gst_v4l2_buffer_pool_alloc_buffer (GstBufferPool * bpool, GstBuffer ** buffer,
       group = gst_v4l2_allocator_alloc_dmabuf (pool->vallocator,
           pool->allocator);
       break;
-    case GST_V4L2_IO_USERPTR:
+    case GST_V4L2_IO_USERPTR:{
+      GstFlowReturn fret = GST_FLOW_OK;
+      GstBuffer *downstream_buffer = NULL;
+      int i;
+
+      newbuf = gst_buffer_new ();
       group = gst_v4l2_allocator_alloc_userptr (pool->vallocator);
+
+      for (i = 0; i < group->n_mem; i++)
+        gst_buffer_append_memory (newbuf, group->mem[i]);
+
+      GST_BUFFER_FLAG_UNSET (newbuf, GST_BUFFER_FLAG_TAG_MEMORY);
+
+      group = NULL;
+
+      fret =
+          gst_buffer_pool_acquire_buffer (pool->other_pool, &downstream_buffer,
+          NULL);
+      if (fret != GST_FLOW_OK) {
+        GST_ERROR_OBJECT (pool,
+            "failed to allocate buffer from downstream pool. reason %s",
+            gst_flow_get_name (fret));
+        return fret;
+      }
+
+      fret =
+          gst_v4l2_buffer_pool_import_userptr (pool, newbuf, downstream_buffer);
+      if (fret != GST_FLOW_OK) {
+        GST_ERROR_OBJECT (pool, "failed to import buffer %p. reason %s",
+            downstream_buffer, gst_flow_get_name (fret));
+        return fret;
+      }
       break;
+    }
     case GST_V4L2_IO_DMABUF_IMPORT:
       group = gst_v4l2_allocator_alloc_dmabufin (pool->vallocator);
       break;
